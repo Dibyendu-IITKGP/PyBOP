@@ -59,8 +59,7 @@ from .costs.base_cost import BaseCost
 from .costs.fitting_costs import (
     RootMeanSquaredError,
     SumSquaredError,
-    ObserverCost,
-    MAP,
+    ObserverCost
 )
 from .costs.design_costs import (
     DesignCost,
@@ -71,6 +70,8 @@ from .costs._likelihoods import (
     BaseLikelihood,
     GaussianLogLikelihood,
     GaussianLogLikelihoodKnownSigma,
+    LogPosterior,
+    MAP,
 )
 
 #
@@ -114,12 +115,29 @@ from .optimisers.pints_optimisers import (
 )
 
 #
+# Monte Carlo classes
+#
+from .samplers import BaseSampler
+from .samplers.base_mcmc import BasePintsSampler
+from .samplers.pints_samplers import (
+    NUTS, DREAM, AdaptiveCovarianceMCMC,
+    DifferentialEvolutionMCMC, DramACMC,
+    EmceeHammerMCMC,
+    HaarioACMC, HaarioBardenetACMC,
+    HamiltonianMCMC, MALAMCMC,
+    MetropolisRandomWalkMCMC, MonomialGammaHamiltonianMCMC,
+    PopulationMCMC, RaoBlackwellACMC,
+    RelativisticMCMC, SliceDoublingMCMC,
+    SliceRankShrinkingMCMC, SliceStepoutMCMC,
+)
+from .samplers.mcmc_sampler import MCMCSampler
+
+#
 # Parameter classes
 #
 from .parameters.parameter import Parameter
 from .parameters.parameter_set import ParameterSet
-from .parameters.priors import BasePrior, Gaussian, Uniform, Exponential
-
+from .parameters.priors import BasePrior, Gaussian, Uniform, Exponential, GaussianLogPrior, ComposedLogPrior
 
 #
 # Observer classes
