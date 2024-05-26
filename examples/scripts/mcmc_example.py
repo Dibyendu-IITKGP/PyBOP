@@ -51,7 +51,7 @@ dataset = pybop.Dataset(
 
 signal = ["Voltage [V]", "Bulk open-circuit voltage [V]"]
 
-# Generate problem, cost function, and optimisation class
+# Generate problem, likelihood, and sampler
 problem = pybop.FittingProblem(
     model, parameters, dataset, signal=signal, init_soc=init_soc
 )
