@@ -56,6 +56,38 @@ class BasePrior:
         """
         return self.prior.logpdf(x, loc=self.loc, scale=self.scale)
 
+    def icdf(self, q):
+        """
+        Calculates the inverse cumulative distribution function (CDF) of the distribution at q.
+
+        Parameters
+        ----------
+        q : float
+            The point(s) at which to evaluate the inverse CDF.
+
+        Returns
+        -------
+        float
+            The inverse cumulative distribution function value at q.
+        """
+        return self.prior.ppf(q, scale=self.scale, loc=self.loc)
+
+    def cdf(self, x):
+        """
+        Calculates the cumulative distribution function (CDF) of the distribution at x.
+
+        Parameters
+        ----------
+        x : float
+            The point(s) at which to evaluate the CDF.
+
+        Returns
+        -------
+        float
+            The cumulative distribution function value at x.
+        """
+        return self.prior.cdf(x, scale=self.scale, loc=self.loc)
+
     def rvs(self, size=1, random_state=None):
         """
         Generates random variates from the distribution.
@@ -145,6 +177,44 @@ class Gaussian(BasePrior):
         self.loc = mean
         self.scale = sigma
         self.prior = stats.norm
+        self._offset = -0.5 * np.log(2 * np.pi * self.scale**2)
+        self.sigma2 = self.scale**2
+        self._multip = -1 / (2.0 * self.sigma2)
+        self._n_parameters = 1
+
+    def __call__(self, x):
+        """
+        Evaluates the gaussian (log) distribution at x.
+
+        Parameters
+        ----------
+        x : float
+            The point(s) at which to evaluate the distribution.
+
+        Returns
+        -------
+        float
+            The value(s) of the distribution at x.
+        """
+        return self.logpdf(x)
+
+    def evaluateS1(self, x):
+        """
+        Evaluates the first derivative of the gaussian (log) distribution at x.
+
+        Parameters
+        ----------
+        x : float
+            The point(s) at which to evaluate the first derivative.
+
+        Returns
+        -------
+        float
+            The value(s) of the first derivative at x.
+        """
+        if not isinstance(x, np.ndarray):
+            x = np.asarray(x)
+        return self(x), -(x - self.loc) * self._multip
 
 
 class Uniform(BasePrior):
@@ -169,6 +239,41 @@ class Uniform(BasePrior):
         self.loc = lower
         self.scale = upper - lower
         self.prior = stats.uniform
+        self._n_parameters = 1
+
+    def __call__(self, x):
+        """
+        Evaluates the gaussian (log) distribution at x.
+
+        Parameters
+        ----------
+        x : float
+            The point(s) at which to evaluate the distribution.
+
+        Returns
+        -------
+        float
+            The value(s) of the distribution at x.
+        """
+        return self.logpdf(x)
+
+    def evaluateS1(self, x):
+        """
+        Evaluates the first derivative of the log uniform distribution at x.
+
+        Parameters
+        ----------
+        x : float
+            The point(s) at which to evaluate the first derivative.
+
+        Returns
+        -------
+        float
+            The value(s) of the first derivative at x.
+        """
+        log_pdf = self.__call__(x)
+        dlog_pdf = np.zeros_like(x)
+        return log_pdf, dlog_pdf
 
     @property
     def mean(self):
@@ -203,31 +308,6 @@ class Exponential(BasePrior):
         self.loc = loc
         self.scale = scale
         self.prior = stats.expon
-
-
-class GaussianLogPrior(BasePrior):
-    """
-    Represents a log-normal distribution with a given mean and standard deviation.
-
-    This class provides methods to calculate the probability density function (pdf),
-    the logarithm of the pdf, and to generate random variates (rvs) from the distribution.
-
-    Parameters
-    ----------
-    mean : float
-        The mean of the log-normal distribution.
-    sigma : float
-        The standard deviation of the log-normal distribution.
-    """
-
-    def __init__(self, mean, sigma, random_state=None):
-        self.name = "Gaussian Log Prior"
-        self.loc = mean
-        self.scale = sigma
-        self.prior = stats.norm
-        self._offset = -0.5 * np.log(2 * np.pi * self.scale**2)
-        self.sigma2 = self.scale**2
-        self._multip = -1 / (2.0 * self.sigma2)
         self._n_parameters = 1
 
     def __call__(self, x):
@@ -244,12 +324,11 @@ class GaussianLogPrior(BasePrior):
         float
             The value(s) of the distribution at x.
         """
-        x = np.asarray(x)
-        return self._offset + self._multip * (x[0] - self.loc) ** 2
+        return self.logpdf(x)
 
     def evaluateS1(self, x):
         """
-        Evaluates the first derivative of the gaussian (log) distribution at x.
+        Evaluates the first derivative of the log exponential distribution at x.
 
         Parameters
         ----------
@@ -261,41 +340,9 @@ class GaussianLogPrior(BasePrior):
         float
             The value(s) of the first derivative at x.
         """
-        if not isinstance(x, np.ndarray):
-            x = np.asarray(x)
-        return self(x), -(x - self.loc) * self._multip
-
-    def icdf(self, q):
-        """
-        Calculates the inverse cumulative distribution function (CDF) of the distribution at q.
-
-        Parameters
-        ----------
-        q : float
-            The point(s) at which to evaluate the inverse CDF.
-
-        Returns
-        -------
-        float
-            The inverse cumulative distribution function value at q.
-        """
-        return self.prior.ppf(q, s=self.scale, loc=self.loc)
-
-    def cdf(self, x):
-        """
-        Calculates the cumulative distribution function (CDF) of the distribution at x.
-
-        Parameters
-        ----------
-        x : float
-            The point(s) at which to evaluate the CDF.
-
-        Returns
-        -------
-        float
-            The cumulative distribution function value at x.
-        """
-        return self.prior.cdf(x, s=self.scale, loc=self.loc)
+        log_pdf = self.__call__(x)
+        dlog_pdf = -1 / self.scale * np.ones_like(x)
+        return log_pdf, dlog_pdf
 
 
 class ComposedLogPrior(BasePrior):
@@ -327,7 +374,7 @@ class ComposedLogPrior(BasePrior):
         """
         if not isinstance(x, np.ndarray):
             x = np.asarray(x)
-        return sum(prior(x) for prior in self._priors)
+        return sum(prior(x) for prior, x in zip(self._priors, x))
 
     def evaluateS1(self, x):
         """
@@ -360,3 +407,6 @@ class ComposedLogPrior(BasePrior):
             index += num_params
 
         return output, doutput
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}, priors: {self._priors}"
