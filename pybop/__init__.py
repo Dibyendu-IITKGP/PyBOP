@@ -85,7 +85,8 @@ from .costs.base_cost import BaseCost
 from .costs.fitting_costs import (
     RootMeanSquaredError,
     SumSquaredError,
-    ObserverCost
+    ObserverCost,
+    MAP,
 )
 from .costs.design_costs import (
     DesignCost,
@@ -138,6 +139,7 @@ from .samplers.pints_samplers import (
     SliceRankShrinkingMCMC, SliceStepoutMCMC,
 )
 from .samplers.mcmc_sampler import MCMCSampler
+from .samplers.mcmc_summary import PosteriorSummary
 
 #
 # Observer classes

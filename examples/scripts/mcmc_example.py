@@ -1,11 +1,10 @@
 import numpy as np
-import plotly.graph_objects as go
 
 import pybop
 
 # Parameter set and model definition
 parameter_set = pybop.ParameterSet.pybamm("Chen2020")
-model = pybop.lithium_ion.SPM(parameter_set=parameter_set)
+synth_model = pybop.lithium_ion.DFN(parameter_set=parameter_set)
 
 # Fitting parameters
 parameters = [
@@ -20,18 +19,18 @@ parameters = [
 ]
 
 # Generate data
-init_soc = 0.5
+init_soc = 1.0
 sigma = 0.001
 experiment = pybop.Experiment(
     [
         (
-            "Discharge at 0.5C for 3 minutes (2 second period)",
-            "Charge at 0.5C for 3 minutes (2 second period)",
+            "Discharge at 0.5C until 2.5V (10 second period)",
+            "Charge at 0.5C until 4.2V (10 second period)",
         ),
     ]
-    * 2
+    # * 2
 )
-values = model.predict(init_soc=init_soc, experiment=experiment)
+values = synth_model.predict(init_soc=init_soc, experiment=experiment)
 
 
 def noise(sigma):
@@ -49,43 +48,37 @@ dataset = pybop.Dataset(
     }
 )
 
+model = pybop.lithium_ion.SPM(parameter_set=parameter_set)
 signal = ["Voltage [V]", "Bulk open-circuit voltage [V]"]
 
 # Generate problem, likelihood, and sampler
 problem = pybop.FittingProblem(
     model, parameters, dataset, signal=signal, init_soc=init_soc
 )
-likelihood = pybop.GaussianLogLikelihoodKnownSigma(problem, sigma=[0.02, 0.02])
-prior1 = pybop.Gaussian(0.7, 0.02)
-prior2 = pybop.Gaussian(0.6, 0.02)
+likelihood = pybop.GaussianLogLikelihoodKnownSigma(problem, sigma=[0.002, 0.002])
+prior1 = pybop.Gaussian(0.7, 0.1)
+prior2 = pybop.Gaussian(0.6, 0.1)
 composed_prior = pybop.ComposedLogPrior(prior1, prior2)
 posterior = pybop.LogPosterior(likelihood, composed_prior)
-x0 = [[0.68, 0.58], [0.68, 0.58], [0.68, 0.58]]
+
+x0 = []
+n_chains = 10
+for i in range(n_chains):
+    x0.append(np.array([0.68, 0.58]))
 
 optim = pybop.DREAM(
     posterior,
-    chains=3,
+    chains=n_chains,
     x0=x0,
-    max_iterations=400,
-    initial_phase_iterations=250,
-    # parallel=True, # uncomment to enable parallelisation (MacOS/Linux only)
+    max_iterations=1000,
+    initial_phase_iterations=500,
+    parallel=True,
 )
 result = optim.run()
 
-
-# Create a histogram
-fig = go.Figure()
-for i, data in enumerate(result):
-    fig.add_trace(go.Histogram(x=data[:, 0], name="Neg", opacity=0.75))
-    fig.add_trace(go.Histogram(x=data[:, 1], name="Pos", opacity=0.75))
-
-# Update layout for better visualization
-fig.update_layout(
-    title="Posterior distribution of volume fractions",
-    xaxis_title="Value",
-    yaxis_title="Count",
-    barmode="overlay",
-)
-
-# Show the plot
-fig.show()
+# Summary statistics
+posterior_summary = pybop.PosteriorSummary(result)
+print(posterior_summary.get_summary_statistics())
+posterior_summary.plot_trace()
+posterior_summary.summary_table()
+posterior_summary.plot_posterior()

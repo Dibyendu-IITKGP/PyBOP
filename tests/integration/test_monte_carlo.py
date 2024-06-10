@@ -77,7 +77,7 @@ class Test_Sampling_SPM:
 
         # Define the cost to optimise
         problem = pybop.FittingProblem(model, parameters, dataset, init_soc=init_soc)
-        return cost_class(problem, sigma=[0.002])
+        return cost_class(problem, sigma=0.002)
 
     @pytest.mark.parametrize(
         "quick_sampler",
