@@ -70,8 +70,8 @@ optim = pybop.DREAM(
     posterior,
     chains=n_chains,
     x0=x0,
-    max_iterations=1000,
-    initial_phase_iterations=500,
+    max_iterations=2500,
+    burn_in=250,
     parallel=True,
 )
 result = optim.run()
