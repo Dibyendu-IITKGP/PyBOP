@@ -77,7 +77,7 @@ class Test_Sampling_SPM:
 
         # Define the cost to optimise
         problem = pybop.FittingProblem(model, parameters, dataset, init_soc=init_soc)
-        return cost_class(problem, sigma=0.002)
+        return cost_class(problem, sigma0=0.002)
 
     @pytest.mark.parametrize(
         "quick_sampler",
@@ -95,6 +95,7 @@ class Test_Sampling_SPM:
         ],
     )
     # Samplers that either have along runtime, or converge slowly
+    # Need to assess how to perform integration tests with these samplers
     # @pytest.mark.parametrize(
     #     "long_sampler",
     #     [
@@ -110,7 +111,6 @@ class Test_Sampling_SPM:
 
     @pytest.mark.integration
     def test_sampling_spm(self, quick_sampler, spm_likelihood):
-        x0 = spm_likelihood.x0
         prior1 = pybop.Uniform(0.4, 0.7)
         prior2 = pybop.Uniform(0.4, 0.7)
         composed_prior = pybop.ComposedLogPrior(prior1, prior2)
@@ -120,7 +120,7 @@ class Test_Sampling_SPM:
             posterior,
             chains=3,
             x0=x0,
-            burn_in=50,
+            warm_up=50,
             max_iterations=400,
         )
         results = sampler.run()

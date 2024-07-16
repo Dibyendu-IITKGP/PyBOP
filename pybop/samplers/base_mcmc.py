@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
 from pints import (
@@ -9,7 +9,7 @@ from pints import (
     SingleChainMCMC,
 )
 
-from pybop import BaseCost, BaseSampler, LogPosterior
+from pybop import BaseCost, BaseSampler
 
 
 class BasePintsSampler(BaseSampler):
@@ -23,10 +23,10 @@ class BasePintsSampler(BaseSampler):
 
     def __init__(
         self,
-        log_pdf: Union[BaseCost, List[BaseCost]],
+        log_pdf: Union[BaseCost, list[BaseCost]],
         chains: int,
         sampler,
-        burn_in=None,
+        warm_up=None,
         x0=None,
         cov0=None,
         transformation=None,
@@ -56,7 +56,7 @@ class BasePintsSampler(BaseSampler):
         self._evaluation_files = kwargs.get("evaluation_files", None)
         self._parallel = kwargs.get("parallel", False)
         self._verbose = kwargs.get("verbose", False)
-        self.burn_in = burn_in
+        self.warm_up = warm_up
         self.n_parameters = (
             log_pdf[0].n_parameters
             if isinstance(log_pdf, list)
@@ -108,7 +108,7 @@ class BasePintsSampler(BaseSampler):
                 self._n_samplers = 1
                 self._samplers = [sampler(self._n_chains, self._x0, self._cov0)]
         except Exception as e:
-            raise ValueError(f"Error constructing samplers: {e}")
+            raise ValueError(f"Error constructing samplers: {e}") from e
 
         # Check for sensitivities from sampler and set evaluation
         self._needs_sensitivities = self._samplers[0].needs_sensitivities()
@@ -123,7 +123,7 @@ class BasePintsSampler(BaseSampler):
         self.set_parallel(self._parallel)
 
     def _apply_transformation(self, transformation):
-        # TODO: Implement transformation logic
+        # TODO: Implement transformation logic (alongside #357)
         pass
 
     def run(self) -> Optional[np.ndarray]:
@@ -203,8 +203,8 @@ class BasePintsSampler(BaseSampler):
 
         self._finalise_logging()
 
-        if self.burn_in:
-            self._samples = self._samples[:, self.burn_in :, :]
+        if self.warm_up:
+            self._samples = self._samples[:, self.warm_up :, :]
 
         return self._samples if self._chains_in_memory else None
 
@@ -252,7 +252,7 @@ class BasePintsSampler(BaseSampler):
                 self._samples = ys_store
 
             es = []
-            for i, y in enumerate(ys):
+            for i, _y in enumerate(ys):
                 if accepted[i]:
                     self._sampled_logpdf[i] = (
                         fys[0][i] if self._needs_sensitivities else fys[i]
@@ -270,25 +270,6 @@ class BasePintsSampler(BaseSampler):
 
             for i, e in enumerate(es):
                 self._evaluations[i, self._iteration] = e
-
-    def _initialise_logging(self):
-        logging.basicConfig(format="%(message)s", level=logging.INFO)
-
-        if self._log_to_screen:
-            logging.info("Using " + str(self._samplers[0].name()))
-            logging.info("Generating " + str(self._n_chains) + " chains.")
-            if self._parallel:
-                logging.info(
-                    f"Running in parallel with {self._n_workers} worker processes."
-                )
-            else:
-                logging.info("Running in sequential mode.")
-            if self._chain_files:
-                logging.info("Writing chains to " + self._chain_files[0] + " etc.")
-            if self._evaluation_files:
-                logging.info(
-                    "Writing evaluations to " + self._evaluation_files[0] + " etc."
-                )
 
     def _check_stopping_criteria(self):
         has_stopping_criterion = False
@@ -314,63 +295,4 @@ class BasePintsSampler(BaseSampler):
                 SequentialEvaluator(f)
                 if not self._multi_log_pdf
                 else MultiSequentialEvaluator(f)
-            )
-
-    def _check_initial_phase(self):
-        # Set initial phase if needed
-        if self._initial_phase:
-            for sampler in self._samplers:
-                sampler.set_initial_phase(True)
-
-    def _inverse_transform(self, y):
-        return self._transformation.to_model(y) if self._transformation else y
-
-    def _initialise_storage(self):
-        self._prior = None
-        if isinstance(self._log_pdf, LogPosterior):
-            self._prior = self._log_pdf.prior()
-
-        # Storage of the received samples
-        self._sampled_logpdf = np.zeros(self._n_chains)
-        self._sampled_prior = np.zeros(self._n_chains)
-
-        # Pre-allocate arrays for chain storage
-        self._samples = np.zeros(
-            (self._n_chains, self._max_iterations, self.n_parameters)
-        )
-
-        # Pre-allocate arrays for evaluation storage
-        if self._prior:
-            # Store posterior, likelihood, prior
-            self._evaluations = np.zeros((self._n_chains, self._max_iterations, 3))
-        else:
-            # Store pdf
-            self._evaluations = np.zeros((self._n_chains, self._max_iterations))
-
-        # From PINTS:
-        # Some samplers need intermediate steps, where `None` is returned instead
-        # of a sample. But samplers can run asynchronously, so that one can return
-        # `None` while another returns a sample. To deal with this, we maintain a
-        # list of 'active' samplers that have not reached `max_iterations`,
-        # and store the number of samples so far in each chain.
-        if self._single_chain:
-            self._active = list(range(self._n_chains))
-            self._n_samples = [0] * self._n_chains
-
-    def _end_initial_phase(self):
-        for sampler in self._samplers:
-            sampler.set_initial_phase(False)
-        if self._log_to_screen:
-            logging.info("Initial phase completed.")
-
-    def _ask_for_samples(self):
-        if self._single_chain:
-            return [self._samplers[i].ask() for i in self._active]
-        else:
-            return self._samplers[0].ask()
-
-    def _finalise_logging(self):
-        if self._log_to_screen:
-            logging.info(
-                f"Halting: Maximum number of iterations ({self._iteration}) reached."
             )

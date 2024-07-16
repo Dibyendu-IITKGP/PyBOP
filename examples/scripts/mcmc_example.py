@@ -9,12 +9,14 @@ synth_model = pybop.lithium_ion.DFN(parameter_set=parameter_set)
 # Fitting parameters
 parameters = [
     pybop.Parameter(
-        "Negative electrode active material volume fraction",
-        prior=pybop.Gaussian(0.68, 0.05),
+        "Negative electrode thickness [m]",
+        prior=pybop.Gaussian(8e-05, 0.5e-05),
+        true_value=parameter_set["Negative electrode thickness [m]"],
     ),
     pybop.Parameter(
-        "Positive electrode active material volume fraction",
-        prior=pybop.Gaussian(0.58, 0.05),
+        "Positive electrode thickness [m]",
+        prior=pybop.Gaussian(7.5e-05, 0.5e-05),
+        true_value=parameter_set["Positive electrode thickness [m]"],
     ),
 ]
 
@@ -48,30 +50,30 @@ dataset = pybop.Dataset(
     }
 )
 
-model = pybop.lithium_ion.SPM(parameter_set=parameter_set)
+model = pybop.lithium_ion.SPMe(parameter_set=parameter_set)
 signal = ["Voltage [V]", "Bulk open-circuit voltage [V]"]
 
 # Generate problem, likelihood, and sampler
 problem = pybop.FittingProblem(
     model, parameters, dataset, signal=signal, init_soc=init_soc
 )
-likelihood = pybop.GaussianLogLikelihoodKnownSigma(problem, sigma=[0.002, 0.002])
-prior1 = pybop.Gaussian(0.7, 0.1)
-prior2 = pybop.Gaussian(0.6, 0.1)
+likelihood = pybop.GaussianLogLikelihoodKnownSigma(problem, sigma0=0.002)
+prior1 = pybop.Gaussian(8e-05, 0.5e-05)
+prior2 = pybop.Gaussian(7.5e-05, 0.5e-05)
 composed_prior = pybop.ComposedLogPrior(prior1, prior2)
 posterior = pybop.LogPosterior(likelihood, composed_prior)
 
 x0 = []
 n_chains = 10
-for i in range(n_chains):
-    x0.append(np.array([0.68, 0.58]))
+for _i in range(n_chains):
+    x0.append(np.array([8.5e-05, 7.5e-05]))
 
 optim = pybop.DREAM(
     posterior,
     chains=n_chains,
     x0=x0,
-    max_iterations=2500,
-    burn_in=250,
+    max_iterations=300,
+    burn_in=100,
     parallel=True,
 )
 result = optim.run()
